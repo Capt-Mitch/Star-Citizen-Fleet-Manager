@@ -1,6 +1,6 @@
 [
   { "name": "Extract CSS to external files", "status": "done" },
   { "name": "Extract JavaScript to external files", "status": "done" },
-  { "name": "Modularize HTML components", "status": "in-progress" },
-  { "name": "Update index.html to use modular files", "status": "pending" }
+  { "name": "Modularize HTML components (starfield-banner, cockpit-header, main-control-panel, diagnostics-panel, edit-modal, dashboard-panel, add-form-panel, wishlist-panel, trading-panel, search-panel, detail-panel, nav-tabs, settings-panel)", "status": "done" },
+  { "name": "Update index.html to use modular files", "status": "completed" }
 ]

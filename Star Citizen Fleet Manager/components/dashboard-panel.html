@@ -1,0 +1,50 @@
+<!-- Dashboard Panel Component -->
+<div id="dashboard" class="content active">
+  <div class="main-panel">
+    <h2>Fleet Dashboard</h2>
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <h3>Ships</h3>
+        <div class="metric-value" id="ship-count">0</div>
+        <div class="metric-label">Total Ships</div>
+      </div>
+      <div class="metric-card">
+        <h3>Items</h3>
+        <div class="metric-value" id="item-count">0</div>
+        <div class="metric-label">Total Items</div>
+      </div>
+      <div class="metric-card">
+        <h3>Fleet Value</h3>
+        <div class="metric-value" id="fleet-value">0 aUEC</div>
+        <div class="metric-label">Total Value</div>
+      </div>
+      <div class="metric-card">
+        <h3>Data Quality</h3>
+        <div class="metric-value" id="data-quality">0%</div>
+        <div class="metric-label">Avg. Reliability</div>
+      </div>
+    </div>
+    <table id="stats-table">
+      <thead>
+        <tr>
+          <th>Image</th>
+          <th>Name</th>
+          <th>Manufacturer/Type</th>
+          <th>Role</th>
+          <th>Size</th>
+          <th>HP</th>
+          <th>Shield</th>
+          <th>Cargo</th>
+          <th>Qty</th>
+          <th>Location</th>
+          <th>Loadout/Notes</th>
+          <th>Reliability</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Populated by JS -->
+      </tbody>
+    </table>
+  </div>
+</div>

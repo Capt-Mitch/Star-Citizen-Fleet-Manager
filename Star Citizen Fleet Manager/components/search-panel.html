@@ -1,0 +1,38 @@
+<!-- Search Panel Component -->
+<div id="search" class="content">
+  <div class="main-panel">
+    <h2>Search Fleet</h2>
+    <div class="form-section">
+      <input id="search-query" placeholder="Search by name...">
+      <input id="search-filter-manufacturer" placeholder="Manufacturer/Type">
+      <input id="search-filter-role" placeholder="Role">
+      <select id="search-filter-type">
+        <option value="">All Types</option>
+        <option value="ship">Ship</option>
+        <option value="item">Item</option>
+        <option value="commodity">Commodity</option>
+      </select>
+      <button id="perform-search-btn">Search</button>
+      <button id="clear-search-btn">Clear</button>
+    </div>
+    <table id="search-table">
+      <thead>
+        <tr>
+          <th>Image</th>
+          <th>Name</th>
+          <th>Manufacturer/Type</th>
+          <th>Role</th>
+          <th>Size</th>
+          <th>Qty</th>
+          <th>Location</th>
+          <th>Notes</th>
+          <th>Reliability</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td colspan="10" style="text-align: center; color: #888;">Enter search criteria and click Search to find assets.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
