@@ -1,0 +1,39 @@
+<!-- Edit Modal Component -->
+<div id="edit-modal" class="modal">
+  <div class="modal-content">
+    <span class="close">&times;</span>
+    <h3 class="modal-title">◐ EDIT ASSET</h3>
+    <div class="modal-form">
+      <input id="edit-name" placeholder="Name" disabled>
+      <input id="edit-manufacturer" placeholder="Manufacturer/Type">
+      <select id="edit-role">
+        <option value="">Select Role</option>
+        <option>Military</option>
+        <option>Civilian</option>
+        <option>Industrial</option>
+        <option>Miner</option>
+        <option>Ground Vehicle</option>
+        <option>Racing</option>
+        <option>Exploration</option>
+        <option>Other</option>
+      </select>
+      <input id="edit-size" placeholder="Size">
+      <input id="edit-qty" type="number" placeholder="Quantity" min="1">
+      <input id="edit-location" placeholder="Location">
+      <input id="edit-loadout" placeholder="Loadout (for ships)">
+      <input id="edit-notes" placeholder="Notes">
+      <input id="edit-buy-price" type="number" placeholder="Buy Price (for items)" min="0">
+      <input id="edit-image" placeholder="Image URL">
+      <select id="edit-type" style="display:none;">
+        <option>weapon</option>
+        <option>armor</option>
+        <option>component</option>
+        <option>commodity</option>
+        <option>consumable</option>
+        <option>tool</option>
+        <option>other</option>
+      </select>
+      <button id="save-edit">SAVE CHANGES</button>
+    </div>
+  </div>
+</div>

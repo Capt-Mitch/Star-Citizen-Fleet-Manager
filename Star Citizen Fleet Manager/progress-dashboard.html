@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fleet Manager Modularization Progress</title>
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #101820; color: #fff; margin: 0; padding: 0; }
+    .container { max-width: 500px; margin: 40px auto; background: #1a2332; border-radius: 12px; box-shadow: 0 2px 16px #0008; padding: 32px; }
+    h1 { font-size: 1.5em; margin-bottom: 24px; text-align: center; }
+    .progress-bar-bg { background: #222c3c; border-radius: 8px; height: 24px; margin-bottom: 24px; }
+    .progress-bar { background: #00ffe1; height: 100%; border-radius: 8px; transition: width 0.5s; }
+    ul { list-style: none; padding: 0; }
+    li { margin: 12px 0; font-size: 1.1em; }
+    .done { color: #00ff88; }
+    .in-progress { color: #ffd700; }
+    .pending { color: #aaa; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Fleet Manager Modularization Progress</h1>
+    <div class="progress-bar-bg">
+      <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
+    </div>
+    <ul id="task-list">
+      <!-- Tasks will be injected here -->
+    </ul>
+  </div>
+  <script>
+    const tasks = [
+      { name: 'Extract CSS to external files', status: 'done' },
+      { name: 'Extract JavaScript to external files', status: 'done' },
+      { name: 'Modularize HTML components', status: 'in-progress' },
+      { name: 'Update index.html to use modular files', status: 'pending' }
+    ];
+    const statusClass = { done: 'done', 'in-progress': 'in-progress', pending: 'pending' };
+    const statusText = { done: '✔️', 'in-progress': '⏳', pending: '⏺️' };
+    const taskList = document.getElementById('task-list');
+    let completed = 0;
+    tasks.forEach(task => {
+      if (task.status === 'done') completed++;
+      const li = document.createElement('li');
+      li.className = statusClass[task.status];
+      li.innerHTML = `${statusText[task.status]} ${task.name}`;
+      taskList.appendChild(li);
+    });
+    const percent = Math.round((completed / tasks.length) * 100);
+    document.getElementById('progress-bar').style.width = percent + '%';
+  </script>
+</body>
+</html>
