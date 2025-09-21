@@ -1,0 +1,6 @@
+[
+  { "name": "Extract CSS to external files", "status": "done" },
+  { "name": "Extract JavaScript to external files", "status": "done" },
+  { "name": "Modularize HTML components", "status": "in-progress" },
+  { "name": "Update index.html to use modular files", "status": "pending" }
+]
