@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Star Citizen Fleet Manager v2.0</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/dexie@3/dist/dexie.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Orbitron', Arial, sans-serif;
+            background: radial-gradient(circle, #001022, #000000);
+            color: #00FFFF;
+            overflow-x: hidden;
+            position: relative;
+        }
+        /* Starfield */
+        .starfield {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            opacity: 0.8;
+        }
+        .holo-panel {
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid #00FFFF;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.7);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px auto;
+            max-width: 1200px;
+            backdrop-filter: blur(5px);
+            animation: boot-up 1s ease-in-out;
+            position: relative;
+            z-index: 1;
+        }
+        @keyframes boot-up {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        .header {
+            text-align: center;
+            text-shadow: 0 0 5px #00FFFF;
+            font-size: 2em;
+        }
+        .nav-tabs {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        .nav-tab {
+            padding: 10px 20px;
+            margin: 0 5px;
+            border: 2px solid #00FFFF;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: box-shadow 0.3s;
+        }
+        .nav-tab:hover {
+            box-shadow: 0 0 15px #00FFFF;
+        }
+        .nav-tab.active {
+            background: rgba(0, 255, 255, 0.2);
+            border-bottom: 4px solid #FF4500;
+        }
+        .content {
+            display: none;
+        }
+        .content.active {
+            display: block;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        .metric-card {
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid #00FFFF;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+        .alert {
+            color: #FF4500;
+            text-shadow: 0 0 5px #FF4500;
+        }
+        input, select, button {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #00FFFF;
+            color: #00FFFF;
+            padding: 5px;
+            margin: 5px;
+            font-family: 'Orbitron', Arial, sans-serif;
+        }
+        button:hover {
+            box-shadow: 0 0 10px #00FFFF;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #00FFFF;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background: rgba(0, 255, 255, 0.1);
+        }
+        .confidence-green { color: green; }
+        .confidence-yellow { color: yellow; }
+        .confidence-red { color: #FF4500; }
+        #offline-banner {
+            background: rgba(255, 69, 0, 0.8);
+            color: white;
+            text-align: center;
+            padding: 10px;
+            display: none;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        canvas {
+            background: transparent !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="starfield"></div>
+    <div id="offline-banner" class="alert">Offline Mode - Using Cached Data</div>
+    <div class="holo-panel">
+        <div class="header">Star Citizen Fleet Manager v2.0<br><small>UEE Citizen Console - Citizen: <span id="user-handle">Anonymous</span></small></div>
+        <div class="nav-tabs">
+            <div class="nav-tab active" data-tab="dashboard">Dashboard HUD</div>
+            <div class="nav-tab" data-tab="add">Add Asset</div>
+            <div class="nav-tab" data-tab="search">Search Fleet</div>
+            <div class="nav-tab" data-tab="trading">Trade Routes</div>
+            <div class="nav-tab" data-tab="wishlist">Wishlist Scanner</div>
+            <div class="nav-tab" data-tab="settings">Settings</div>
+        </div>
+        <button id="sync-btn">Sync with Verse</button>
+        <button id="export-btn">Export Hangar Data</button>
+        <button id="import-btn">Import CSV</button>
+        <input type="file" id="import-file" style="display: none;">
+        <div id="dashboard" class="content active">
+            <div class="metrics-grid">
+                <div class="metric-card">Total Fleet Value: <span id="total-value">0</span> aUEC</div>
+                <div class="metric-card">Ships: <span id="ship-count">0</span></div>
+                <div class="metric-card">Items: <span id="item-count">0</span></div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <canvas id="size-pie-chart"></canvas>
+                <canvas id="manufacturer-bar-chart"></canvas>
+            </div>
+            <table id="stats-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Qty</th>
+                        <th>Value</th>
+                        <th>Location</th>
+                        <th>Confidence</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div id="add" class="content">
+            <div class="form-grid">
+                <div>
+                    <h3>Add Ship</h3>
+                    <input id="ship-name" placeholder="Name">
+                    <input id="ship-manufacturer" placeholder="Manufacturer">
+                    <input id="ship-size" placeholder="Size">
+                    <input id="ship-qty" type="number" placeholder="Quantity" value="1">
+                    <input id="ship-location" placeholder="Location">
+                    <input id="ship-notes" placeholder="Notes">
+                    <button onclick="addShip()">Add Ship</button>
+                </div>
+                <div>
+                    <h3>Add Item</h3>
+                    <input id="item-name" placeholder="Name">
+                    <select id="item-type">
+                        <option>weapon</option>
+                        <option>armor</option>
+                        <option>component</option>
+                        <option>commodity</option>
+                    </select>
+                    <input id="item-size" placeholder="Size">
+                    <input id="item-qty" type="number" placeholder="Quantity" value="1">
+                    <input id="item-location" placeholder="Location">
+                    <input id="item-buy-price" type="number" placeholder="Buy Price (aUEC/SCU)">
+                    <button onclick="addItem()">Add Item</button>
+                </div>
+            </div>
+        </div>
+        <div id="search" class="content">
+            <input id="search-query" placeholder="Search...">
+            <select id="search-filter-type">
+                <option value="">All Types</option>
+                <option>ship</option>
+                <option>weapon</option>
+                <option>armor</option>
+                <option>component</option>
+                <option>commodity</option>
+            </select>
+            <input id="search-filter-location" placeholder="Location Filter">
+            <button onclick="performSearch()">Search</button>
+            <table id="search-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Qty</th>
+                        <th>Value</th>
+                        <th>Location</th>
+                        <th>Confidence</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div id="trading" class="content">
+            <table id="trading-table">
+                <thead>
+                    <tr>
+                        <th>Commodity</th>
+                        <th>Qty</th>
+                        <th>Best Port</th>
+                        <th>Sell/SCU</th>
+                        <th>Profit</th>
+                        <th>Alert</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div id="wishlist" class="content">
+            <h3>Add to Wishlist</h3>
+            <input id="wishlist-name" placeholder="Name">
+            <select id="wishlist-type">
+                <option>ship</option>
+                <option>item</option>
+            </select>
+            <input id="wishlist-target-price" type="number" placeholder="Target Price">
+            <input id="wishlist-notes" placeholder="Notes">
+            <button onclick="addToWishlist()">Add</button>
+            <table id="wishlist-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Target Price</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div id="settings" class="content">
+            <h3>Settings</h3>
+            <input id="uex-key" placeholder="UEX API Key">
+            <button onclick="saveUexKey()">Save UEX Key</button>
+            <input id="user-handle-input" placeholder="User Handle">
+            <button onclick="saveUserHandle()">Save Handle</button>
+        </div>
+    </div>
+
+    <script>
+        // DB Setup
+        const db = new Dexie('SCFleetManager');
+        db.version(1).stores({
+            ships: 'name, manufacturer, size, value, owned_qty, location, notes, last_sync, confidence_score',
+            items: '++id, name, type, size, owned_qty, value, location, acquired_date, buy_price, confidence_score',
+            wishlist: 'name, type, target_price, notes',
+            audit_log: '++id, timestamp, source, item_name, changes, verified',
+            settings: 'key, value'
+        });
+
+        // Mock sources for testing; in real, use actual APIs
+        const sources = [
+            { name: 'Wiki', url: 'https://api.star-citizen.wiki/v2/vehicles/', field: 'value' }, // Adjust fields
+            { name: 'FleetYards', url: 'https://api.fleetyards.net/vehicles/', field: 'value' }
+        ];
+
+        // UEX for commodities
+        let uexKey = localStorage.getItem('uexKey') || '';
+
+        async function verifyData(itemName, itemType) {
+            const results = [];
+            for (const src of sources) {
+                try {
+                    const response = await fetch(`${src.url}${itemName}`); // Assume endpoint format; adjust per API
+                    const data = await response.json();
+                    results.push({ source: src.name, value: data[src.field] || 0 });
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+            const values = results.map(r => r.value).filter(v => v > 0);
+            if (values.length < 2) return { value: values[0] || 0, confidence: 0.5, sources: results.map(r => r.source) };
+            const avg = values.reduce((a, b) => a + b, 0) / values.length;
+            const maxDiff = Math.max(...values.map(v => Math.abs(v - avg)));
+            const variance = maxDiff / avg;
+            const confidence = variance < 0.1 ? 1 : variance < 0.15 ? 0.8 : 0.6;
+            return { value: avg, confidence, sources: results.map(r => r.source) };
+        }
+
+        async function addShip() {
+            const name = document.getElementById('ship-name').value;
+            const verified = await verifyData(name, 'ship');
+            await db.ships.put({
+                name,
+                manufacturer: document.getElementById('ship-manufacturer').value,
+                size: document.getElementById('ship-size').value,
+                value: verified.value,
+                owned_qty: parseInt(document.getElementById('ship-qty').value),
+                location: document.getElementById('ship-location').value,
+                notes: document.getElementById('ship-notes').value,
+                last_sync: Date.now(),
+                confidence_score: verified.confidence
+            });
+            await logAudit('Add Ship', name, verified);
+            updateDashboard();
+        }
+
+        async function addItem() {
+            const name = document.getElementById('item-name').value;
+            const verified = await verifyData(name, 'item');
+            await db.items.add({
+                name,
+                type: document.getElementById('item-type').value,
+                size: document.getElementById('item-size').value,
+                owned_qty: parseInt(document.getElementById('item-qty').value),
+                value: verified.value,
+                location: document.getElementById('item-location').value,
+                acquired_date: new Date(),
+                buy_price: parseFloat(document.getElementById('item-buy-price').value),
+                confidence_score: verified.confidence
+            });
+            await logAudit('Add Item', name, verified);
+            updateDashboard();
+        }
+
+        async function logAudit(action, itemName, changes) {
+            await db.audit_log.add({
+                timestamp: new Date(),
+                source: action,
+                item_name: itemName,
+                changes: JSON.stringify(changes),
+                verified: true
+            });
+        }
+
+        async function updateDashboard() {
+            const ships = await db.ships.toArray();
+            const items = await db.items.toArray();
+
+            const totalValue = ships.reduce((sum, s) => sum + s.value * s.owned_qty, 0) + items.reduce((sum, i) => sum + i.value * i.owned_qty, 0);
+            document.getElementById('total-value').textContent = totalValue.toLocaleString();
+            document.getElementById('ship-count').textContent = ships.length;
+            document.getElementById('item-count').textContent = items.length;
+
+            // Charts
+            const sizeCounts = ships.reduce((acc, s) => {
+                acc[s.size] = (acc[s.size] || 0) + 1;
+                return acc;
+            }, {});
+            new Chart(document.getElementById('size-pie-chart'), {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(sizeCounts),
+                    datasets: [{ data: Object.values(sizeCounts), backgroundColor: ['#00FFFF', '#FF4500', '#FFFF00'] }]
+                },
+                options: { responsive: true, plugins: { legend: { labels: { color: '#00FFFF' } } } }
+            });
+
+            const manufacturerValues = ships.reduce((acc, s) => {
+                acc[s.manufacturer] = (acc[s.manufacturer] || 0) + s.value * s.owned_qty;
+                return acc;
+            }, {});
+            new Chart(document.getElementById('manufacturer-bar-chart'), {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(manufacturerValues),
+                    datasets: [{ label: 'Value', data: Object.values(manufacturerValues), backgroundColor: '#00FFFF' }]
+                },
+                options: { responsive: true, scales: { y: { ticks: { color: '#00FFFF' } }, x: { ticks: { color: '#00FFFF' } } } }
+            });
+
+            // Stats Table
+            const tableBody = document.querySelector('#stats-table tbody');
+            tableBody.innerHTML = '';
+            ships.forEach(s => addRowToTable(tableBody, s, 'ship'));
+            items.forEach(i => addRowToTable(tableBody, i, 'item'));
+        }
+
+        function addRowToTable(tableBody, item, type) {
+            const row = tableBody.insertRow();
+            row.innerHTML = `
+                <td>${item.name}</td>
+                <td>${type === 'ship' ? 'Ship' : item.type}</td>
+                <td>${item.owned_qty}</td>
+                <td>${item.value}</td>
+                <td>${item.location}</td>
+                <td class="${getConfidenceClass(item.confidence_score)}">${item.confidence_score}</td>
+                <td><button onclick="editItem('${type}', '${item.name || item.id}')">Edit</button> <button onclick="deleteItem('${type}', '${item.name || item.id}')">Delete</button></td>
+            `;
+        }
+
+        function getConfidenceClass(score) {
+            if (score >= 1) return 'confidence-green';
+            if (score >= 0.8) return 'confidence-yellow';
+            return 'confidence-red';
+        }
+
+        // Placeholder for editItem and deleteItem
+        async function editItem(type, id) {
+            // Implement edit logic
+            alert('Edit not implemented yet');
+        }
+
+        async function deleteItem(type, id) {
+            if (type === 'ship') await db.ships.delete(id);
+            else await db.items.delete(parseInt(id));
+            updateDashboard();
+        }
+
+        async function performSearch() {
+            const query = document.getElementById('search-query').value.toLowerCase();
+            const filterType = document.getElementById('search-filter-type').value;
+            const filterLocation = document.getElementById('search-filter-location').value.toLowerCase();
+
+            const ships = await db.ships.toArray();
+            const items = await db.items.toArray();
+
+            const results = [...ships.map(s => ({...s, type: 'ship'})), ...items.map(i => ({...i, type: i.type}))].filter(item => {
+                return (query === '' || item.name.toLowerCase().includes(query)) &&
+                       (filterType === '' || item.type === filterType) &&
+                       (filterLocation === '' || item.location.toLowerCase().includes(filterLocation));
+            });
+
+            const tableBody = document.querySelector('#search-table tbody');
+            tableBody.innerHTML = '';
+            results.forEach(item => addRowToTable(tableBody, item, item.type));
+        }
+
+        async function updateTrading() {
+            if (!uexKey) {
+                alert('Please set UEX API Key in Settings');
+                return;
+            }
+            const commodities = await db.items.where('type').equals('commodity').toArray();
+            const tableBody = document.querySelector('#trading-table tbody');
+            tableBody.innerHTML = '';
+            for (const comm of commodities) {
+                try {
+                    const response = await fetch(`https://api.uexcorp.space/commodities/${comm.name}/prices`, {
+                        headers: { 'api_key': uexKey }
+                    });
+                    const data = await response.json();
+                    // Assume data has sell locations; mock logic
+                    const bestPort = 'New Babbage'; // Mock
+                    const sellPrice = 2500; // Mock
+                    const profit = (sellPrice - comm.buy_price) * comm.owned_qty;
+                    const alert = profit > comm.buy_price * comm.owned_qty * 0.2 ? 'High Profit!' : '';
+                    const row = tableBody.insertRow();
+                    row.innerHTML = `
+                        <td>${comm.name}</td>
+                        <td>${comm.owned_qty}</td>
+                        <td>${bestPort}</td>
+                        <td>${sellPrice}</td>
+                        <td>${profit}</td>
+                        <td class="alert">${alert}</td>
+                    `;
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+        }
+
+        async function addToWishlist() {
+            const name = document.getElementById('wishlist-name').value;
+            await db.wishlist.put({
+                name,
+                type: document.getElementById('wishlist-type').value,
+                target_price: parseFloat(document.getElementById('wishlist-target-price').value),
+                notes: document.getElementById('wishlist-notes').value
+            });
+            updateWishlistTable();
+        }
+
+        async function updateWishlistTable() {
+            const wishlist = await db.wishlist.toArray();
+            const tableBody = document.querySelector('#wishlist-table tbody');
+            tableBody.innerHTML = '';
+            wishlist.forEach(w => {
+                const row = tableBody.insertRow();
+                row.innerHTML = `
+                    <td>${w.name}</td>
+                    <td>${w.type}</td>
+                    <td>${w.target_price}</td>
+                    <td><button onclick="deleteWishlist('${w.name}')">Delete</button></td>
+                `;
+            });
+        }
+
+        async function deleteWishlist(name) {
+            await db.wishlist.delete(name);
+            updateWishlistTable();
+        }
+
+        // Sync function
+        async function syncData() {
+            if (!navigator.onLine) {
+                document.getElementById('offline-banner').style.display = 'block';
+                return;
+            }
+            document.getElementById('offline-banner').style.display = 'none';
+            // Sync ships and items
+            const ships = await db.ships.toArray();
+            for (const ship of ships) {
+                const verified = await verifyData(ship.name, 'ship');
+                if (Math.abs(verified.value - ship.value) / ship.value < 0.15 || confirm('Update value?')) {
+                    await db.ships.update(ship.name, { value: verified.value, confidence_score: verified.confidence, last_sync: Date.now() });
+                }
+            }
+            // Similar for items
+            const items = await db.items.toArray();
+            for (const item of items) {
+                const verified = await verifyData(item.name, 'item');
+                if (Math.abs(verified.value - item.value) / item.value < 0.15 || confirm('Update value?')) {
+                    await db.items.update(item.id, { value: verified.value, confidence_score: verified.confidence });
+                }
+            }
+            updateDashboard();
+            updateTrading();
+            checkWishlistAlerts();
+        }
+
+        async function checkWishlistAlerts() {
+            const wishlist = await db.wishlist.toArray();
+            for (const w of wishlist) {
+                const verified = await verifyData(w.name, w.type);
+                if (verified.value <= w.target_price) {
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        new Notification(`Price Drop Alert: ${w.name} at ${verified.value} aUEC!`);
+                    } else {
+                        alert(`Price Drop Alert: ${w.name} at ${verified.value} aUEC!`);
+                    }
+                }
+            }
+        }
+
+        // Export
+        document.getElementById('export-btn').onclick = async () => {
+            const ships = await db.ships.toArray();
+            const items = await db.items.toArray();
+            const data = { ships, items };
+            const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'fleet.json';
+            a.click();
+        };
+
+        // Import
+        document.getElementById('import-btn').onclick = () => document.getElementById('import-file').click();
+        document.getElementById('import-file').onchange = async (e) => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = async (ev) => {
+                const data = JSON.parse(ev.target.result);
+                await db.ships.bulkPut(data.ships);
+                await db.items.bulkPut(data.items);
+                updateDashboard();
+            };
+            reader.readAsText(file);
+        };
+
+        // Settings
+        function saveUexKey() {
+            uexKey = document.getElementById('uex-key').value;
+            localStorage.setItem('uexKey', uexKey);
+        }
+
+        function saveUserHandle() {
+            const handle = document.getElementById('user-handle-input').value;
+            document.getElementById('user-handle').textContent = handle;
+            localStorage.setItem('userHandle', handle);
+        }
+
+        // Tab switching
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+                document.getElementById(tab.dataset.tab).classList.add('active');
+                if (tab.dataset.tab === 'dashboard') updateDashboard();
+                if (tab.dataset.tab === 'trading') updateTrading();
+                if (tab.dataset.tab === 'wishlist') updateWishlistTable();
+            });
+        });
+
+        // Sync button
+        document.getElementById('sync-btn').onclick = syncData;
+
+        // Create starfield
+        function createStars() {
+            const starfield = document.querySelector('.starfield');
+            for (let i = 0; i < 200; i++) {
+                const star = document.createElement('div');
+                star.classList.add('star');
+                star.style.width = star.style.height = Math.random() * 2 + 'px';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.left = Math.random() * 100 + '%';
+                starfield.appendChild(star);
+            }
+        }
+
+        // Init
+        async function init() {
+            createStars();
+            document.getElementById('user-handle').textContent = localStorage.getItem('userHandle') || 'Anonymous';
+            updateDashboard();
+            updateWishlistTable();
+            if (!navigator.onLine) document.getElementById('offline-banner').style.display = 'block';
+            // Request notification permission
+            if ('Notification' in window) Notification.requestPermission();
+        }
+
+        init();
+    </script>
+</body>
+</html>

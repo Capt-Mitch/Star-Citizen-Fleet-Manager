@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Star Citizen Fleet Manager v2.6.0</title>
+  
+  <!-- External Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@300;400;700;900&display=swap" rel="stylesheet">
+  
+  <!-- CSS Files -->
+  <link rel="stylesheet" href="css/cockpit-theme.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/animations.css">
+  
+  <!-- External Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/dexie@3/dist/dexie.js"></script>
+</head>
+<body>
+  <div class="starfield"></div>
+  <div id="offline-banner" class="alert">⚠️ OFFLINE MODE - Using Cached Data Only</div>
+  
+  <div class="cockpit-container">
+    <!-- === COCKPIT HEADER === -->
+    <div class="cockpit-header">
+      <!-- Left Panel: Fleet Status -->
+      <div class="ship-status-panel">
+        <h3>▲ FLEET STATUS</h3>
+        <div class="status-grid">
+          <div class="status-item">
+            <div class="label">SHIPS</div>
+            <div class="value" id="header-ship-count">0</div>
+          </div>
+          <div class="status-item">
+            <div class="label">ITEMS</div>
+            <div class="value" id="header-item-count">0</div>
+          </div>
+          <div class="status-item">
+            <div class="label">VALUE</div>
+            <div class="value" id="header-fleet-value">0 aUEC</div>
+          </div>
+          <div class="status-item">
+            <div class="label">QUALITY</div>
+            <div class="value" id="header-data-quality">0%</div>
+          </div>
+        </div>
+        <div class="version-display">
+          <div class="version-label">STAR CITIZEN LIVE</div>
+          <div class="version-number" id="sc-version-display">Loading...</div>
+          <div id="version-status" class="version-status">Connecting...</div>
+        </div>
+      </div>
+      
+      <!-- Center Panel: Main Title & Controls -->
+      <div class="main-control-panel">
+        <div class="main-title">FLEET MANAGER</div>
+        <div class="subtitle">
+          v2.6.0 • Citizen: <span id="user-handle">Anonymous</span>
+        </div>
+        
+        <div class="control-grid">
+          <button class="cockpit-button" id="sync-btn">◯ SYNC</button>
+          <button class="cockpit-button" id="export-btn">▲ EXPORT</button>
+          <button class="cockpit-button" id="import-btn">▼ IMPORT</button>
+          <button class="cockpit-button" id="refresh-version-btn">◐ VERSION</button>
+          <button class="cockpit-button" id="health-check-btn">◑ HEALTH</button>
+          <button class="cockpit-button" id="clear-cache-btn">◒ CACHE</button>
+        </div>
+        <input type="file" id="import-file" style="display: none;">
+      </div>
+      
+      <!-- Right Panel: Ship Diagnostics -->
+      <div class="diagnostics-panel">
+        <h3>▲ DIAGNOSTICS</h3>
+        <div class="warning-lights" id="api-status-compact">
+          <div class="system-check">Checking systems...</div>
+        </div>
+        <div class="ship-terminal" id="activity-log-compact">
+          <div class="terminal-header">▼ ACTIVITY LOG</div>
+          <div class="terminal-content"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- === SYNC STATUS === -->
+    <div id="sync-status" class="sync-status">
+      <div class="loading-spinner"></div>
+      <span id="sync-message">Syncing with the Verse...</span>
+    </div>
+
+    <!-- === MAIN PANEL === -->
+    <div class="main-panel">
+      <!-- Navigation Tabs -->
+      <div class="nav-tabs">
+        <div class="nav-tab active" data-tab="dashboard">◆ DASHBOARD</div>
+        <div class="nav-tab" data-tab="add">+ ADD ASSET</div>
+        <div class="nav-tab" data-tab="search">◇ SEARCH FLEET</div>
+        <div class="nav-tab" data-tab="trading">◈ TRADE ROUTES</div>
+        <div class="nav-tab" data-tab="wishlist">☆ WISHLIST</div>
+        <div class="nav-tab" data-tab="settings">◉ SETTINGS</div>
+      </div>
+
+      <!-- Dashboard Content -->
+      <div id="dashboard" class="content active">
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <h3>▲ FLEET SHIPS</h3>
+            <div class="metric-value" id="ship-count">0</div>
+            <div class="metric-label">Total Vessels</div>
+          </div>
+          <div class="metric-card">
+            <h3>■ INVENTORY</h3>
+            <div class="metric-value" id="item-count">0</div>
+            <div class="metric-label">Items & Components</div>
+          </div>
+          <div class="metric-card">
+            <h3>♦ FLEET VALUE</h3>
+            <div class="metric-value" id="fleet-value">0 aUEC</div>
+            <div class="metric-label">Estimated Worth</div>
+          </div>
+          <div class="metric-card">
+            <h3>◐ DATA INTEGRITY</h3>
+            <div class="metric-value" id="data-quality">0%</div>
+            <div class="metric-label">Reliability Score</div>
+          </div>
+        </div>
+        
+        <div style="overflow-x: auto;">
+          <table id="stats-table">
+            <thead>
+              <tr>
+                <th>IMG</th>
+                <th data-sort="name">NAME</th>
+                <th data-sort="manufacturer">MANUFACTURER</th>
+                <th data-sort="role">ROLE</th>
+                <th data-sort="size">SIZE</th>
+                <th data-sort="hp">HP</th>
+                <th data-sort="shield">SHIELD</th>
+                <th data-sort="cargo">CARGO SCU</th>
+                <th data-sort="owned_qty">QTY</th>
+                <th data-sort="location">LOCATION</th>
+                <th>LOADOUT/NOTES</th>
+                <th data-sort="data_reliability_score">RELIABILITY <span class="tooltip">?<span class="tooltiptext">Data reliability based on source verification and update frequency. Green = Excellent, Yellow = Good, Red = Poor</span></span></th>
+                <th>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Add Asset Content -->
+      <div id="add" class="content">
+        <div class="form-grid">
+          <div class="form-section">
+            <h3>▲ ADD SHIP TO FLEET</h3>
+            <input id="ship-name" placeholder="Ship Name (e.g., Gladius)" required>
+            <input id="ship-manufacturer" placeholder="Manufacturer (e.g., Aegis Dynamics)">
+            <select id="ship-role">
+              <option value="">Select Role</option>
+              <option>Military</option>
+              <option>Civilian</option>
+              <option>Industrial</option>
+              <option>Miner</option>
+              <option>Ground Vehicle</option>
+              <option>Racing</option>
+              <option>Exploration</option>
+              <option>Other</option>
+            </select>
+            <input id="ship-size" placeholder="Size Class (Small/Medium/Large/Capital)">
+            <input id="ship-qty" type="number" placeholder="Quantity" value="1" min="1">
+            <input id="ship-location" placeholder="Location (e.g., Area18 Hangar 01)">
+            <input id="ship-loadout" placeholder="Custom Loadout (optional)">
+            <input id="ship-notes" placeholder="Additional Notes">
+            <input id="ship-image" placeholder="Custom Image URL (optional)">
+            <button id="add-ship-btn">+ ADD SHIP TO FLEET</button>
+          </div>
+          <div class="form-section">
+            <h3>■ ADD ITEM TO INVENTORY</h3>
+            <input id="item-name" placeholder="Item Name (e.g., Size 3 Laser Cannon)" required>
+            <select id="item-type">
+              <option>weapon</option>
+              <option>armor</option>
+              <option>component</option>
+              <option>commodity</option>
+              <option>consumable</option>
+              <option>tool</option>
+              <option>other</option>
+            </select>
+            <input id="item-size" placeholder="Size (S1, S2, S3, etc.)">
+            <input id="item-qty" type="number" placeholder="Quantity" value="1" min="1">
+            <input id="item-location" placeholder="Storage Location">
+            <input id="item-buy-price" type="number" placeholder="Purchase Price (aUEC)" min="0">
+            <input id="item-notes" placeholder="Additional Notes">
+            <button id="add-item-btn">+ ADD ITEM TO INVENTORY</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search Content -->
+      <div id="search" class="content">
+        <div class="search-controls">
+          <input id="search-query" placeholder="◇ Search by name...">
+          <select id="search-filter-type">
+            <option value="">All Types</option>
+            <option>ship</option>
+            <option>weapon</option>
+            <option>armor</option>
+            <option>component</option>
+            <option>commodity</option>
+          </select>
+          <input id="search-filter-manufacturer" placeholder="Manufacturer...">
+          <select id="search-filter-role">
+            <option value="">All Roles</option>
+            <option>Military</option>
+            <option>Civilian</option>
+            <option>Industrial</option>
+            <option>Miner</option>
+            <option>Ground Vehicle</option>
+          </select>
+          <button id="perform-search-btn">◇ SEARCH FLEET</button>
+          <button id="clear-search-btn">◒ CLEAR</button>
+        </div>
+        
+        <div style="overflow-x: auto;">
+          <table id="search-table">
+            <thead>
+              <tr>
+                <th>IMG</th>
+                <th>NAME</th>
+                <th>TYPE/MANUFACTURER</th>
+                <th>ROLE</th>
+                <th>SIZE</th>
+                <th>QTY</th>
+                <th>LOCATION</th>
+                <th>NOTES</th>
+                <th>RELIABILITY</th>
+                <th>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Trading Content -->
+      <div id="trading" class="content">
+        <div class="enhanced-card">
+          <h3>◈ COMMODITY TRADING ANALYSIS</h3>
+          <p>Monitor your commodity investments and discover profitable trading routes across the verse.</p>
+        </div>
+        <div style="overflow-x: auto;">
+          <table id="trading-table">
+            <thead>
+              <tr>
+                <th>COMMODITY</th>
+                <th>QUANTITY</th>
+                <th>BEST SELL LOCATION</th>
+                <th>PRICE PER SCU</th>
+                <th>EST. PROFIT</th>
+                <th>ALERT LEVEL</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Wishlist Content -->
+      <div id="wishlist" class="content">
+        <div class="enhanced-card">
+          <h3>☆ FLEET WISHLIST</h3>
+          <div class="wishlist-form">
+            <input id="wishlist-name" placeholder="Ship/Item Name" required>
+            <select id="wishlist-type">
+              <option>ship</option>
+              <option>item</option>
+            </select>
+            <input id="wishlist-target-price" type="number" placeholder="Target Price (aUEC)" min="0">
+            <input id="wishlist-notes" placeholder="Notes">
+            <button id="add-wishlist-btn">+ ADD TO WISHLIST</button>
+          </div>
+        </div>
+        <div style="overflow-x: auto;">
+          <table id="wishlist-table">
+            <thead>
+              <tr>
+                <th>NAME</th>
+                <th>TYPE</th>
+                <th>TARGET PRICE</th>
+                <th>NOTES</th>
+                <th>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Settings Content -->
+      <div id="settings" class="content">
+        <div class="form-grid">
+          <div class="form-section">
+            <h3>◉ API CONFIGURATION</h3>
+            <input id="uex-key" placeholder="UEX API Key (optional)" type="password">
+            <button id="save-uex-btn">SAVE UEX KEY</button>
+            <input id="sc-api-key" placeholder="StarCitizen-API Key (optional)" type="password">
+            <button id="save-sc-api-btn">SAVE SC API KEY</button>
+            <div class="api-info">
+              StarCitizen-API key enables live data fetching.<br>Get yours at <strong>starcitizen-api.com</strong>
+            </div>
+          </div>
+          <div class="form-section">
+            <h3>◐ CITIZEN PROFILE</h3>
+            <input id="user-handle-input" placeholder="Your Citizen Handle" maxlength="20">
+            <button id="save-user-btn">SAVE HANDLE</button>
+            <div class="api-info">
+              Your Star Citizen handle for personalization
+            </div>
+          </div>
+          <div class="form-section">
+            <h3>◑ SYSTEM HEALTH</h3>
+            <div id="settings-api-health"></div>
+            <button id="test-apis-btn">TEST ALL APIS</button>
+            <button id="refresh-all-btn">REFRESH ALL DATA</button>
+          </div>
+          <div class="form-section">
+            <h3>◒ DATA MANAGEMENT</h3>
+            <button id="backup-data-btn">BACKUP FLEET DATA</button>
+            <button id="clear-cache-settings-btn">CLEAR CACHE</button>
+            <button id="clear-all-data-btn" class="danger-btn">⚠️ RESET ALL DATA</button>
+            <div class="api-info">
+              Regular backups recommended. Reset will clear everything!
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detail View Content -->
+      <div id="detail" class="content">
+        <div id="detail-header" class="detail-header"></div>
+        <div id="detail-info" class="detail-info"></div>
+        <div class="detail-actions">
+          <button id="update-ship-btn" class="cockpit-button" style="display:none;">◯ UPDATE DATA</button>
+          <button id="reset-ship-btn" class="cockpit-button" style="display:none;">◒ RESET DEFAULT</button>
+          <button id="back-btn" class="cockpit-button" onclick="goBackToDashboard()">← BACK TO DASHBOARD</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div id="edit-modal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h3 class="modal-title">◐ EDIT ASSET</h3>
+      <div class="modal-form">
+        <input id="edit-name" placeholder="Name" disabled>
+        <input id="edit-manufacturer" placeholder="Manufacturer/Type">
+        <select id="edit-role">
+          <option value="">Select Role</option>
+          <option>Military</option>
+          <option>Civilian</option>
+          <option>Industrial</option>
+          <option>Miner</option>
+          <option>Ground Vehicle</option>
+          <option>Racing</option>
+          <option>Exploration</option>
+          <option>Other</option>
+        </select>
+        <input id="edit-size" placeholder="Size">
+        <input id="edit-qty" type="number" placeholder="Quantity" min="1">
+        <input id="edit-location" placeholder="Location">
+        <input id="edit-loadout" placeholder="Loadout (for ships)">
+        <input id="edit-notes" placeholder="Notes">
+        <input id="edit-buy-price" type="number" placeholder="Buy Price (for items)" min="0">
+        <input id="edit-image" placeholder="Image URL">
+        <select id="edit-type" style="display:none;">
+          <option>weapon</option>
+          <option>armor</option>
+          <option>component</option>
+          <option>commodity</option>
+          <option>consumable</option>
+          <option>tool</option>
+          <option>other</option>
+        </select>
+        <button id="save-edit">SAVE CHANGES</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript Files -->
+  <script src="js/utils/constants.js"></script>
+  <script src="js/utils/helpers.js"></script>
+  <script src="js/database/db-manager.js"></script>
+  <script src="js/api/version-fetcher.js"></script>
+  <script src="js/api/image-loader.js"></script>
+  <script src="js/api/starcitizen-api.js"></script>
+  <script src="js/ui/dashboard.js"></script>
+  <script src="js/ui/forms.js"></script>
+  <script src="js/ui/modals.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

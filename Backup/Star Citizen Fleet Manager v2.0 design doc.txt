@@ -1,0 +1,407 @@
+Star Citizen Fleet Manager v2.0: Program Design Document
+Date: September 20, 2025Version: 2.0Author: Grok (xAI)Purpose: To define the design, features, and implementation plan for a web-based Star Citizen inventory and trading tracker with cross-verified data sourcing.
+1. Overview
+SC Fleet Manager v2.0 is a single-page web application designed to track a player's Star Citizen assets (ships, items, commodities), provide real-time updates via community APIs, and suggest optimal trading locations based on verified market data. The app minimizes manual input, ensures data accuracy through multi-source validation, and delivers a Star Citizen-themed user interface for immersive usability. It supports solo players and orgs, with offline capability and export options.
+1.1 Goals
+
+Core Functionality:
+Track ships (e.g., name, manufacturer, value, stats, loadout, current location) and items (e.g., type, size, buy price).
+Full-text search with filters (type, location).
+Auto-update stats/prices from community APIs (e.g., Star Citizen Wiki, UEX).
+Dashboard with metrics (total value, counts) and charts (e.g., fleet by size).
+Trading system: Suggest best sell locations for commodities with profit calculations.
+
+
+Data Accuracy:
+Cross-verify data from multiple sources (Wiki, FleetYards, UEX) to reduce errors.
+Assign confidence scores to data points; flag outliers for user review.
+
+
+Usability:
+Star Citizen-themed GUI: Dark starry background, cyan/orange neon, glow effects.
+Offline support via local storage (IndexedDB).
+Mobile-friendly, responsive design.
+
+
+Extensibility:
+Import RSI hangar exports (CSV/JSON via HangarLink).
+Org sharing via JSON exports.
+Wishlist with price alerts for future purchases.
+
+
+Non-Goals:
+Real-time in-game inventory sync (not possible without CIG API).
+Real-money trading or grey-market integration.
+
+
+
+1.2 Target Audience
+
+Solo players managing personal fleets/inventories.
+Orgs tracking collective assets for missions (e.g., Pyro runs).
+Traders optimizing commodity profits across Stanton/Pyro.
+
+2. System Architecture
+2.1 Frontend
+
+Tech Stack: Vanilla HTML, JavaScript, Chart.js (for dashboards), Tailwind CSS (optional for styling).
+Theme: 
+Background: Starry gradient (#000000 to #001022).
+Text/Buttons: Cyan neon (#00FFFF), orange alerts (#FF4500).
+Effects: Glow hovers (box-shadow: 0 0 15px rgba(0, 255, 255, 0.7)).
+Fonts: Arial (fallback; consider Google Fonts 'Orbitron' for HUD vibe if CDN allowed).
+
+
+Components:
+Tabs: Add, Search, Dashboard, Trading, Wishlist.
+Forms: Input for ships/items with auto-fill (fuzzy match to API).
+Tables: Sortable, filterable, with confidence badges (🟢/🟡).
+Charts: Pie (fleet by size), bar (value by manufacturer).
+
+
+
+2.2 Backend/Data Layer
+
+Storage: Dexie.js (IndexedDB) for local, offline persistence.
+Database Schema:
+
+
+Table
+Fields
+Notes
+
+
+
+ships
+name (PK, string), manufacturer (string), size (string), value (float, aUEC), owned_qty (int), location (string, e.g., "Area18"), notes (string), last_sync (timestamp), confidence_score (float, 0-1)
+Auto-filled via API; score from verification.
+
+
+items
+id (PK, auto-increment), name (string), type (enum: weapon/armor/component/commodity), size (string), owned_qty (int), value (float), location (string), acquired_date (date), buy_price (float, aUEC/SCU), confidence_score (float)
+Commodities track buy_price for trading.
+
+
+wishlist
+name (PK, string), type (enum: ship/item), target_price (float), notes (string)
+Alerts on price drops via sync.
+
+
+audit_log
+timestamp (datetime), source (string, e.g., "Wiki"), item_name (string), changes (JSON), verified (bool)
+Tracks sync history, discrepancies.
+
+
+
+
+2.3 Data Flow
+
+Add Item:
+User inputs name (e.g., "CF-337 Panther").
+Fuzzy match to API (Wiki/FleetYards).
+Cross-verify stats (e.g., value) across 2+ sources.
+Store with confidence score; log sources in audit_log.
+
+
+Sync:
+Fetch updates for all items/ships.
+Compare with stored data; update if variance <15% or user approves.
+
+
+Export:
+Generate CSV/JSON with verification metadata (e.g., "confidence: 0.9").
+
+
+Trading:
+Filter commodities → Fetch UEX prices → Suggest top-3 sell locations.
+
+
+
+2.4 Offline Support
+
+Core ops (add, search, view) work via Dexie.js.
+Sync requires internet; cache last-known data for offline display.
+
+3. Data Sources & Cross-Verification Strategy
+To ensure data accuracy, we use multiple sources and validate programmatically. Sources were checked via web searches and community posts (e.g., X, Reddit) for reliability as of September 2025.
+3.1 Data Sources
+
+
+
+Source
+Type
+Data Provided
+Access Method
+Notes
+
+
+
+Star Citizen Wiki API
+Public API
+Ships (stats, manufacturers), components (DPS, size), commodities.
+GET https://api.star-citizen.wiki/v2/vehicles or /components. Docs: docs.star-citizen.wiki.
+Most reliable; community-maintained, auto-updates.
+
+
+FleetYards API
+Public API
+Ships, components, hangars.
+GET https://api.fleetyards.net/vehicles. Docs: fleetyards.net/api.
+Lightweight; good for quick stats.
+
+
+UEX API
+Key-required API
+Commodity prices, trade routes (buy/sell per SCU).
+GET https://api.uexcorp.space/commodities/{name}/prices (needs free key from uexcorp.space/api).
+Crowdsourced; requires proxy for client-side due to CORS.
+
+
+RSI Comm-Links
+Web scrape
+Patch notes, new ships/items.
+Scrape via web_search ("Star Citizen patch notes 2025") or RSS feed.
+Supplements API for updates.
+
+
+SC-Trade.tools
+Web scrape
+Commodity prices, shop inventories.
+Parse HTML tables via JS (e.g., fetch + DOMParser).
+Backup for UEX; less structured.
+
+
+HangarLink
+Tool
+Personal ship inventory (CSV/JSON export).
+Browser extension scrapes RSI Hangar page.
+Semi-auto for owned ships; manual for gear.
+
+
+3.2 Cross-Verification Logic
+
+Process:
+Fetch data for an item (e.g., "RSI Ballista") from 2-3 sources (Wiki, FleetYards, UEX if commodity).
+Compare key fields (e.g., value, size, DPS).
+Calculate variance: (max - min) / avg.
+Assign confidence score:
+Variance <10%: Score = 1.0 (🟢).
+Variance 10-15%: Score = 0.8 (🟡).
+Variance >15%: Score = 0.6 (🔴), flag for user review.
+
+
+Store average value; log sources in audit_log.
+
+
+Pseudocode (tested via mental simulation for accuracy):async function verifyData(itemName, sources) {
+  const results = await Promise.all(sources.map(src => fetchFrom(src, itemName)));
+  const values = results.map(r => r.value).filter(v => v);
+  if (values.length < 2) return { value: values[0] || 0, confidence: 0.5, sources };
+  const avg = values.reduce((a, b) => a + b, 0) / values.length;
+  const variance = Math.max(...values.map(v => Math.abs(v - avg))) / avg;
+  const confidence = variance < 0.1 ? 1 : variance < 0.15 ? 0.8 : 0.6;
+  return { value: avg, confidence, sources: results.map(r => r.source) };
+}
+
+
+Error Reduction:
+Use community reports (e.g., X posts via x_keyword_search) to validate outliers.
+Cache last-known-good data for offline fallback.
+Allow user overrides with "Custom Value" input.
+
+
+
+3.3 Personal Inventory Input
+
+Semi-Automatic:
+RSI Hangar: Use HangarLink/HangarXPLOR to export ships as CSV/JSON. Import via drag-and-drop or file picker.
+In-Game Items: Manual entry from 'I' menu (PIT ring) or screenshots (future: OCR via view_image).
+
+
+Limitations: No server-side auto-sync (CIG restricts). Game files (Data.p4k) yield general assets, not player ownership (ToS risk if modded).
+Workaround: Add "Import CSV" button; map to DB with verification.
+
+4. Features & User Flows
+4.1 Core Inventory
+
+Add:
+Form inputs: Name, type (ship/item), qty, location, notes (ships), buy price (items).
+Auto-fill: Fuzzy match to API (e.g., "Panther" → CF-337 Panther).
+Verify: Cross-check stats across sources; show confidence badge.
+
+
+Edit/Delete: Inline table edits; delete with confirmation.
+Search: Full-text (name, type, location) + filters. Highlight low-confidence items (🔴).
+
+4.2 Dashboard
+
+Metrics:
+Total fleet value (ships + items, in aUEC).
+Ship count, item count.
+
+
+Charts (Chart.js):
+Pie: Ships by size (Small/Medium/Large).
+Bar: Value by manufacturer.
+Optional: Line chart for value trends (if history stored).
+
+
+Stats Table: Sortable, with columns for name, type, qty, value, location, confidence.
+Intelligent Features:
+Flag underused items (e.g., qty < 2 for components).
+Suggest upgrades (e.g., "Swap S3 shield for S4 based on DPS").
+
+
+
+4.3 Trading System
+
+Functionality:
+Filter items by type: commodity.
+Fetch UEX prices (mock or API with key).
+Suggest top-3 sell locations (e.g., "Sell Scrap at New Babbage, 2500/SCU").
+Calculate profit: (sell_price - buy_price) * qty.
+Alert on >20% profit margin.
+
+
+Display: Table with commodity, qty, best port, sell price, profit, alert.
+
+4.4 Wishlist
+
+Functionality:
+Add: Name, type (ship/item), target price.
+Auto-alert: Notify if sync finds price ≤ target (browser notification).
+
+
+Display: Table with name, type, target price.
+
+4.5 Extras
+
+Import: Drag CSV from HangarLink → Parse to ships/items.
+Export: CSV/JSON with confidence scores; PDF (future via jsPDF).
+Org Mode: Password-protected JSON export/import for multi-user sync.
+Alerts: Browser notifications for price drops, patch changes (e.g., "4.3 nerfed Arclight").
+Offline: Full functionality except sync; cache last sync.
+
+5. User Interface Design
+5.1 Theme
+
+Colors:
+Background: #000000 to #001022 gradient (starry space).
+Text/Buttons: Cyan #00FFFF (neon HUD).
+Alerts: Orange #FF4500 (warning lights).
+
+
+Effects: Glow hovers (box-shadow: 0 0 15px rgba(0, 255, 255, 0.7)).
+Layout: Responsive grid (1-col mobile, 2-col desktop).
+Fonts: Arial (safe fallback); optional Orbitron for SC vibe.
+
+5.2 Wireframe (Text-Based)
+[Header: SC Fleet Manager - 🚀 UEE Citizen Console]
+[Buttons: Sync | Export | Tabs: Add | Search | Dashboard | Trading | Wishlist]
+[Tab: Add]
+  [Grid: 2-col]
+    [Ship Form: Name | Qty | Location | Notes | Add Button]
+    [Item Form: Name | Type | Size | Qty | Location | Buy Price | Add Button]
+[Tab: Search]
+  [Input: Search Query]
+  [Table: Name | Type | Qty | Value | Location | Confidence]
+[Tab: Dashboard]
+  [Grid: 3-col Metrics: Total Value | Ships | Items]
+  [Charts: Pie (Sizes) | Bar (Manufacturers)]
+  [Table: All Stats]
+[Tab: Trading]
+  [Table: Commodity | Qty | Best Port | Sell/SCU | Profit | Alert]
+[Tab: Wishlist]
+  [Form: Name | Type | Target Price | Add Button]
+  [Table: Name | Type | Target Price]
+
+6. Implementation Roadmap
+
+
+
+Phase
+Tasks
+Tools/Methods
+Timeline
+
+
+
+1: Source Validation
+Test APIs (Wiki, FleetYards, UEX) with sample queries. Validate via web_search for patch notes, x_keyword_search for community reports.
+JS fetch, Python scripts for testing.
+1 day
+
+
+2: Core Build
+Implement HTML/JS app with Dexie.js, Chart.js. Add verification logic (pseudocode above).
+Local dev; code_execution for snippets.
+3-4 days
+
+
+3: UI/Polish
+Apply SC theme (cyan/orange, glows). Add charts, export. Test mobile responsiveness.
+CSS, Tailwind (optional), view_image for asset checks.
+2 days
+
+
+4: Testing
+Simulate syncs, edge cases (offline, bad data). Validate via x_semantic_search for user feedback (e.g., "SC tracker issues 2025").
+Browser dev tools, manual tests.
+2 days
+
+
+5: Future Enhancements
+Add OCR for in-game screenshots (view_image). Cloud sync for orgs (e.g., Firebase).
+Advanced tools; monitor CIG API updates.
+Post-launch
+
+
+7. Risks & Mitigations
+
+
+
+Risk
+Impact
+Mitigation
+
+
+
+API Downtime/Changes
+Data sync fails; outdated stats.
+Cache last-known data; monitor via web_search cron ("Star Citizen API update 2025"). Fallback to secondary sources.
+
+
+Bad Data
+Incorrect values mislead trading.
+Cross-verify 2-3 sources; user override button; confidence scores in UI.
+
+
+CIG ToS Violation
+Ban risk if accessing game files.
+Stick to public APIs, RSI exports; avoid server-side hacks.
+
+
+Browser Compatibility
+Blank screen or UI bugs.
+Use vanilla JS, minimal CDNs (Dexie, Chart.js); test in Chrome/Edge/Firefox.
+
+
+Manual Input Errors
+Wrong owned qty/location.
+Import CSV from HangarLink; validate inputs with fuzzy matching.
+
+
+8. Future Considerations
+
+CIG API: If released (post-1.0, ~2027?), integrate for real-time inventory sync.
+OCR Integration: Use view_image to parse in-game inventory screenshots.
+Cloud Sync: Firebase or local server for org-wide sharing.
+Custom Fonts: Add Orbitron or SC-specific font via CDN or local asset.
+
+9. References
+
+APIs: Star Citizen Wiki, FleetYards, UEX.
+Tools: HangarLink, HangarXPLOR, StarCitizenWiki GitHub.
+Community: RSI Spectrum, Reddit, X posts (verified via x_keyword_search).
+
+End of Document

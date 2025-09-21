@@ -1,0 +1,40 @@
+Star Citizen Fleet Manager v2.0 Design Document
+Star Citizen Fleet Manager v2.0: Program Design Document
+Date: September 20, 2025
+Version: 2.0 (Revised with Detailed GUI Design)
+Author: Grok (xAI)
+Purpose: To define the design, features, and implementation plan for a web-based Star Citizen inventory and trading tracker with cross-verified data sourcing. This revision incorporates a detailed Graphic GUI design that closely aligns with the Star Citizen universe, emphasizing holographic, futuristic HUD elements for immersion.
+1. Overview
+SC Fleet Manager v2.0 is a single-page web application designed to track a player's Star Citizen assets (ships, items, commodities), provide real-time updates via community APIs, and suggest optimal trading locations based on verified market data. The app minimizes manual input, ensures data accuracy through multi-source validation, and delivers a Star Citizen-themed user interface for immersive usability. It supports solo players and orgs, with offline capability and export options.
+1.1 Goals
+
+Core Functionality: Track ships (e.g., name, manufacturer, value, location) and items (e.g., type, size, buy price). Full-text search with filters (type, location). Auto-update stats/prices from community APIs (e.g., Star Citizen Wiki, UEX). Dashboard with metrics (total value, counts) and charts (e.g., fleet by size). Trading system: Suggest best sell locations for commodities with profit calculations.
+Data Accuracy: Cross-verify data from multiple sources (Wiki, FleetYards, UEX) to reduce errors. Assign confidence scores to data points; flag outliers for user review.
+Usability: Star Citizen-themed GUI: Dark starry background, cyan/orange neon, glow effects. Offline support via local storage (IndexedDB). Mobile-friendly, responsive design.
+Extensibility: Import RSI hangar exports (CSV/JSON via HangarLink). Org sharing via JSON exports. Wishlist with price alerts for future purchases.
+Non-Goals: Real-time in-game inventory sync (not possible without CIG API). Real-money trading or grey-market integration.
+
+1.2 Target Audience
+
+Solo players managing personal fleets/inventories.
+Orgs tracking collective assets for missions (e.g., Pyro runs).
+Traders optimizing commodity profits across Stanton/Pyro.
+
+2. System Architecture
+2.1 Frontend
+
+Tech Stack: Vanilla HTML, JavaScript, Chart.js (for dashboards), Tailwind CSS (optional for styling).
+Theme:
+
+Background: Starry gradient (#000000 to #001022).
+Text/Buttons: Cyan neon (#00FFFF), orange alerts (#FF4500).
+Effects: Glow hovers (box-shadow: 0 0 15px rgba(0, 255, 255, 0.7)).
+Fonts: Arial (fallback; consider Google Fonts 'Orbitron' for HUD vibe if CDN allowed).
+
+
+Components: Tabs: Add, Search, Dashboard, Trading, Wishlist. Forms: Input for ships/items with auto-fill (fuzzy match to API). Tables: Sortable, filterable, with confidence badges (🟢/🟡). Charts: Pie (fleet by size), bar (value by manufacturer).
+
+2.2 Backend/Data Layer
+
+Storage: Dexie.js (IndexedDB) for local, offline persistence.
+Database Schema:
